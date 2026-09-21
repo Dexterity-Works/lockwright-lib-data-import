@@ -1,9 +1,10 @@
-> [!WARNING]
-> 🍐 PearPass is currently paused from active development, so please use at your own caution until further notice.
+# lockwright-lib-data-import
 
-# pearpass-lib-data-import
+A utility for importing data from various password managers into a vault.
 
-A utility for importing data from various password managers into a Pearpass vault.
+Site: [lockwright.dexterity.works](https://lockwright.dexterity.works)
+
+Community fork of PearPass (Apache 2.0). Not affiliated with or endorsed by Tether Data or the Pears project.
 
 ## Features
 
@@ -21,7 +22,7 @@ This library provides functions to parse exported data from the following passwo
 Install the package using npm:
 
 ```bash
-npm install git+https://github.com/tetherto/pearpass-lib-data-import.git
+npm install git+https://github.com/Dexterity-Works/lockwright-lib-data-import.git
 ```
 
 ## Testing
@@ -57,7 +58,7 @@ This project has no production dependencies. Development dependencies are listed
 
 ## Related Projects
 
-*   [@tetherto/pearpass-lib-data-export](https://github.com/tetherto/pearpass-lib-data-export)
+*   [lockwright-lib-data-export](https://github.com/Dexterity-Works/lockwright-lib-data-export)
 
 ## License
 
