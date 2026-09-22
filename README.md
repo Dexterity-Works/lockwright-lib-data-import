@@ -38,7 +38,7 @@ npm test
 Here is an example of how to use the library to parse data from a 1Password export file:
 
 ```javascript
-import { parse1PasswordData } from '@tetherto/pearpass-lib-data-import';
+import { parse1PasswordData } from 'lockwright-lib-data-import';
 import fs from 'fs';
 
 const filePath = 'path/to/your/1password_export.csv';
