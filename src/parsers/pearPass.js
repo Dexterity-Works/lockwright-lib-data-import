@@ -8,14 +8,32 @@ export const parsePearPassJson = (records) =>
     isFavorite: record.isFavorite
   }))
 
+// Splits on commas outside double quotes in one pass. A per-comma look-ahead
+// to end of line is quadratic and freezes the importer on a long line.
+const splitCsvLine = (line) => {
+  const values = []
+  let start = 0
+  let insideQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '"') {
+      insideQuotes = !insideQuotes
+    } else if (line[i] === ',' && !insideQuotes) {
+      values.push(line.slice(start, i))
+      start = i + 1
+    }
+  }
+  values.push(line.slice(start))
+  return values
+}
+
 export const parsePearPassCsv = async (text) => {
   const lines = text.split('\n').filter(Boolean)
   const headers = lines[0].split(',').map((h) => h.replace(/^"|"$/g, ''))
 
   const entries = lines.slice(1).map((line) => {
-    const values = line
-      .split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/)
-      .map((val) => val.replace(/^"|"$/g, '').replace(/""/g, '"'))
+    const values = splitCsvLine(line).map((val) =>
+      val.replace(/^"|"$/g, '').replace(/""/g, '"')
+    )
     const row = headers.reduce((acc, h, i) => {
       acc[h] = values[i]
       return acc

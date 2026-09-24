@@ -170,6 +170,17 @@ describe('parsePearPassCsv', () => {
     expect(result[0].folder).toBe('WiFi')
     expect(result[0].isFavorite).toBe(false)
   })
+
+  it('splits a line with many commas in linear time', async () => {
+    const csv = [
+      '"type","title","note"',
+      `"passPhrase","Long",${','.repeat(100_000)}`
+    ].join('\n')
+    const start = Date.now()
+    const result = await parsePearPassCsv(csv)
+    expect(Date.now() - start).toBeLessThan(1000)
+    expect(result[0].data.title).toBe('Long')
+  })
 })
 
 describe('parsePearPass', () => {
