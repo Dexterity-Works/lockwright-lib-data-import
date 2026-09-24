@@ -15,6 +15,7 @@
     "@noble/ciphers": "1.2.1",
     "@noble/hashes": "1.7.1",
     "@xmldom/xmldom": "0.8.10",
+    "fflate": "0.7.4",
     "kdbxweb": "2.1.1"
   },
   "devDependencies": {

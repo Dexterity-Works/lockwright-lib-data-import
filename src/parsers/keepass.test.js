@@ -26,12 +26,16 @@ jest.mock('kdbxweb', () => {
     }
   }
 
+  const load = jest.fn()
+
   return {
     Credentials: jest.fn(),
     ProtectedValue,
-    Kdbx: {
-      load: jest.fn()
-    },
+    Kdbx: class {},
+    KdbxFormat: Object.assign(
+      jest.fn(() => ({ load })),
+      { load }
+    ),
     CryptoEngine: {
       setArgon2Impl: jest.fn(),
       Argon2TypeArgon2d: 0,
@@ -466,7 +470,7 @@ describe('decryptKeePassKdbx', () => {
       groups: []
     }
 
-    kdbxweb.Kdbx.load.mockResolvedValue({ groups: [mockRootGroup] })
+    kdbxweb.KdbxFormat.load.mockResolvedValue({ groups: [mockRootGroup] })
 
     const result = await decryptKeePassKdbx(new ArrayBuffer(10), 'password')
     expect(result).toEqual(mockRootGroup)
@@ -475,7 +479,7 @@ describe('decryptKeePassKdbx', () => {
   it('throws "Incorrect password" on InvalidKey error', async () => {
     const error = new Error('Invalid key')
     error.code = 'InvalidKey'
-    kdbxweb.Kdbx.load.mockRejectedValue(error)
+    kdbxweb.KdbxFormat.load.mockRejectedValue(error)
 
     await expect(
       decryptKeePassKdbx(new ArrayBuffer(10), 'wrong')
@@ -483,7 +487,7 @@ describe('decryptKeePassKdbx', () => {
   })
 
   it('throws with original error message on other errors', async () => {
-    kdbxweb.Kdbx.load.mockRejectedValue(new Error('Random error'))
+    kdbxweb.KdbxFormat.load.mockRejectedValue(new Error('Random error'))
 
     await expect(
       decryptKeePassKdbx(new ArrayBuffer(10), 'pass')
@@ -491,7 +495,7 @@ describe('decryptKeePassKdbx', () => {
   })
 
   it('registers a pure-JS Argon2 impl when no worklet hook is given', async () => {
-    kdbxweb.Kdbx.load.mockResolvedValue({
+    kdbxweb.KdbxFormat.load.mockResolvedValue({
       groups: [{ name: 'Root', entries: [], groups: [] }]
     })
 
@@ -504,7 +508,7 @@ describe('decryptKeePassKdbx', () => {
   })
 
   it('offloads Argon2 to the worklet hook when one is provided', async () => {
-    kdbxweb.Kdbx.load.mockResolvedValue({
+    kdbxweb.KdbxFormat.load.mockResolvedValue({
       groups: [{ name: 'Root', entries: [], groups: [] }]
     })
     const derived = new Uint8Array([1, 2, 3, 4])
@@ -544,7 +548,7 @@ describe('decryptKeePassKdbx', () => {
   })
 
   it('maps the Argon2d KDF type for the worklet hook', async () => {
-    kdbxweb.Kdbx.load.mockResolvedValue({
+    kdbxweb.KdbxFormat.load.mockResolvedValue({
       groups: [{ name: 'Root', entries: [], groups: [] }]
     })
     const argon2ViaWorklet = jest

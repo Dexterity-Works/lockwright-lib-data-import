@@ -1,5 +1,6 @@
 import { argon2d, argon2id } from '@noble/hashes/argon2'
 import { DOMParser as XmlDomParser } from '@xmldom/xmldom'
+import { Gunzip } from 'fflate'
 import * as _kdbxweb from 'kdbxweb'
 import '../utils/setupCrypto.js'
 
@@ -185,6 +186,80 @@ const walkGroup = (group, parentPath = '') => {
   return results
 }
 
+// ---------------------------------------------------------------------------
+// KDBX gzip cap
+//
+// kdbxweb gunzips the decrypted payload with no output limit, so a small file
+// with a known password can inflate into enough XML to OOM the import thread.
+// We inflate it ourselves in small input steps and stop past the cap. The
+// overrides mirror kdbxweb 2.1.1 (pinned) KdbxFormat internals.
+// ---------------------------------------------------------------------------
+
+// Real vaults, attachments included, sit far below this.
+export const MAX_KDBX_INFLATED_BYTES = 64 * 1024 * 1024
+
+// Deflate expands at most ~1032x, so one step overshoots the cap by <5 MiB.
+const GUNZIP_INPUT_STEP = 4 * 1024
+
+const gunzipCapped = (data) => {
+  const input = new Uint8Array(data)
+  const chunks = []
+  let size = 0
+  const gunzip = new Gunzip((chunk) => {
+    size += chunk.length
+    if (size > MAX_KDBX_INFLATED_BYTES) {
+      throw new Error('Database is too large to import')
+    }
+    chunks.push(chunk)
+  })
+  for (let i = 0; i < input.length; i += GUNZIP_INPUT_STEP) {
+    const end = i + GUNZIP_INPUT_STEP
+    gunzip.push(input.subarray(i, end), end >= input.length)
+  }
+  const out = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.length
+  }
+  return out.buffer
+}
+
+const loadKdbx = (data, credentials) => {
+  const kdbx = new kdbxweb.Kdbx()
+  kdbx.credentials = credentials
+  const format = new kdbxweb.KdbxFormat(kdbx)
+  const { decryptData } = format
+  const takeGzip = () => {
+    const gzip =
+      kdbx.header.compression === kdbxweb.Consts.CompressionAlgorithm.GZip
+    kdbx.header.compression = kdbxweb.Consts.CompressionAlgorithm.None
+    return gzip
+  }
+
+  // KDBX4: the decrypted payload is the gzip stream.
+  format.decryptData = async (...args) => {
+    const decrypted = await decryptData.apply(format, args)
+    if (kdbx.header.versionMajor !== 4 || !takeGzip()) return decrypted
+    return gunzipCapped(decrypted)
+  }
+
+  // KDBX3: gzip sits inside hashed blocks. Mirrors KdbxFormat#decryptXmlV3.
+  format.decryptXmlV3 = async (stm) => {
+    const encrypted = stm.readBytesToEnd()
+    const masterKey = await format.getMasterKeyV3()
+    const decrypted = await decryptData.call(format, encrypted, masterKey)
+    kdbxweb.ByteUtils.zeroBuffer(masterKey)
+    let payload = await kdbxweb.HashedBlockTransform.decrypt(
+      format.trimStartBytesV3(decrypted)
+    )
+    if (takeGzip()) payload = gunzipCapped(payload)
+    return kdbxweb.ByteUtils.bytesToString(payload)
+  }
+
+  return format.load(data)
+}
+
 /**
  * Parses a KDBX (KeePass 2.x) encrypted database file.
  * @param {ArrayBuffer} arrayBuffer - Raw KDBX file contents.
@@ -217,10 +292,7 @@ export const decryptKeePassKdbx = async (
     const credentials = new kdbxweb.Credentials(
       kdbxweb.ProtectedValue.fromString(password)
     )
-    db = await kdbxweb.Kdbx.load(
-      new Uint8Array(arrayBuffer).buffer,
-      credentials
-    )
+    db = await loadKdbx(new Uint8Array(arrayBuffer).buffer, credentials)
   } catch (error) {
     if (
       error?.code === kdbxweb.Consts.ErrorCodes.InvalidKey ||
