@@ -15,6 +15,7 @@ Newer contributors are encouraged to start small and simple. Tests - both failin
 
 - Keep pull requests focused on a single feature or bug fix
 - Provide a clear description of changes
+- After cloning, run `git config core.hooksPath .husky` so the pre-commit lint hook runs
 - Ensure code passes linting: `npm run lint`
 - Ensure tests are passing: `npm test`
   - except, of course, any added failing tests
